@@ -47,7 +47,13 @@ class SerialComms(object):
 
     def connect(self):
         """ Connects to the device and starts the read thread """
-        self.serial = serial.Serial(dsrdtr=True, rtscts=True, port=self.port, baudrate=self.baudrate,
+        if ":" in self.port:
+            self.log.debug("Opening url {}".format(self.port))
+            self.serial = serial.serial_for_url(self.port,dsrdtr=True, rtscts=True, baudrate=self.baudrate,
+                                    timeout=self.timeout,*self.com_args,**self.com_kwargs)
+        else:
+            self.log.debug("Opening regular port {}".format(self.port))
+            self.serial = serial.Serial(dsrdtr=True, rtscts=True, port=self.port, baudrate=self.baudrate,
                                     timeout=self.timeout,*self.com_args,**self.com_kwargs)
         # Start read thread
         self.alive = True

@@ -182,6 +182,7 @@ class GsmModem(SerialComms):
         self._smsEncoding = 'GSM' # Default SMS encoding
         self._smsSupportedEncodingNames = None # List of available encoding names
         self._commands = None # List of supported AT commands
+        self._no_atz = False # try ATZ until we get an error
         #Pool of detected DTMF
         self.dtmfpool = []
 
@@ -207,7 +208,14 @@ class GsmModem(SerialComms):
 
         # Send some initialization commands to the modem
         try:
-            self.write('ATZ') # reset configuration
+            if not self._no_atz:
+                self.write('ATZ') # reset configuration
+
+        except CmeError:
+            # HNS 9201 Satellite terminal does NOT like ATZ
+            self._no_atz = True
+            pinCheckComplete = True
+
         except CommandError:
             # Some modems require a SIM PIN at this stage already; unlock it now
             # Attempt to enable detailed error messages (to catch incorrect PIN error)
@@ -215,7 +223,9 @@ class GsmModem(SerialComms):
             self.write('AT+CMEE=1', parseError=False)
             self._unlockSim(pin)
             pinCheckComplete = True
-            self.write('ATZ') # reset configuration
+            if not self._no_atz:
+                self.write('ATZ') # reset configuration
+
         else:
             pinCheckComplete = False
         self.write('ATE0') # echo off
@@ -1153,6 +1163,7 @@ class GsmModem(SerialComms):
                             sms = StatusReport(self, int(msgStat), smsDict['reference'], smsDict['number'], smsDict['time'], smsDict['discharge'], smsDict['status'])
                         else:
                             raise CommandError('Invalid PDU type for readStoredSms(): {0}'.format(smsDict['type']))
+                        logging.debug("Read message {}".format(sms))
                         messages.append(sms)
                         delMessages.add(msgIndex)
                         readPdu = False
@@ -1343,8 +1354,7 @@ class GsmModem(SerialComms):
 
     def _handleSmsReceived(self, notificationLine):
         """ Handler for "new SMS" unsolicited notification line """
-        self.log.debug('SMS message received')
-        if self.smsReceivedCallback is not None:
+        if self.smsReceivedCallback is not None and not "_placeholderCallback" in self.smsReceivedCallback.im_func.__name__:
             cmtiMatch = self.CMTI_REGEX.match(notificationLine)
             if cmtiMatch:
                 msgMemory = cmtiMatch.group(1)
