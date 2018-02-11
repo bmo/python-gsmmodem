@@ -10,6 +10,7 @@ to aid test cases (since I don't have access to every modem in the world ;-) )
 """
 from __future__ import print_function
 import sys
+import logging
 
 from gsmmodem.modem import GsmModem
 from gsmmodem.exceptions import TimeoutException, PinRequiredError, IncorrectPinError
@@ -42,6 +43,7 @@ def parseArgsPy26():
         return options
 
 def main():
+    logging.basicConfig(level=logging.DEBUG)
     args = parseArgsPy26() if sys.version_info[0] == 2 and sys.version_info[1] < 7 else parseArgs()
     print ('args:',args)
     modem = GsmModem(args.port, args.baud)
